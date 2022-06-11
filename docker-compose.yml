@@ -15,11 +15,6 @@ services:
       - ${ES_PORT}:9200
     networks:
       - elk
-    logging:
-        driver: "json-file"
-        options:
-            max-size: "10k"
-            max-file: "10"
   # logstash:
   #   build:
   #     context: .
@@ -43,7 +38,7 @@ services:
     build:
       context: .
       dockerfile: KibanaDockerfile
-    image: kibana
+    image: kibana:local
     container_name: kibana
     environment:
      - "ELASTICSEARCH_URL=http://elasticsearch:9200"
