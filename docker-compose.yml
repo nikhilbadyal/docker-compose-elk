@@ -1,0 +1,59 @@
+version: "3.9"
+
+services:
+  elasticsearch:
+    build:
+      context: .
+      dockerfile: ESDockerfile
+    image: elasticsearch
+    container_name: elasticsearch
+    restart: unless-stopped
+    environment:
+      - xpack.security.enabled=false
+      - discovery.type=single-node
+    ports:
+      - ${ES_PORT}:9200
+    networks:
+      - elk
+    logging:
+        driver: "json-file"
+        options:
+            max-size: "10k"
+            max-file: "10"
+  # logstash:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile-logstash
+  #   container_name: sem_logstash
+  #   # restart: on-failure
+  #   depends_on:
+  #     - mysql
+  #     - elasticsearch
+  #   volumes:
+  #     - ./volumes/logstash/pipeline/:/usr/share/logstash/pipeline/
+  #     - ./volumes/logstash/config/logstash.yml:/usr/share/logstash/config/logstash.yml
+  #     - ./volumes/logstash/config/pipelines.yml:/usr/share/logstash/config/pipelines.yml
+  #     - ./volumes/logstash/config/queries/:/usr/share/logstash/config/queries/
+  #   logging:
+  #     driver: "json-file"
+  #     options:
+  #       max-size: "10k"
+  #       max-file: "10"
+  kibana:
+    build:
+      context: .
+      dockerfile: KibanaDockerfile
+    image: kibana
+    container_name: kibana
+    environment:
+     - "ELASTICSEARCH_URL=http://elasticsearch:9200"
+     - "SERVER_NAME=127.0.0.1"
+    ports:
+     - ${KIBANA_PORT}:5601
+    depends_on:
+     - elasticsearch
+    networks:
+      - elk
+networks:
+  elk:
+    driver: bridge
