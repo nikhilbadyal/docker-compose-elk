@@ -218,8 +218,8 @@ services:
     build:
       context: kibana
       dockerfile: Dockerfile
-    image: kib01:local
-    container_name: kib01
+    image: kibana:local
+    container_name: kibana
     volumes:
       - ./kibana/kibana.yml:/usr/share/kibana/config/kibana.yml
       - certs:/usr/share/kibana/config/certs
