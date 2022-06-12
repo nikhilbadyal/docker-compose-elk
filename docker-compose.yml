@@ -8,7 +8,7 @@ services:
     image: setup:local
     container_name: elk-setup
     volumes:
-      - ./certs:/usr/share/elasticsearch/config/certs
+      - certs:/usr/share/elasticsearch/config/certs
     user: "0"
     command: >
       bash -c '
@@ -54,13 +54,18 @@ services:
         chown -R root:root config/certs;
         find . -type d -exec chmod 750 \{\} \;;
         find . -type f -exec chmod 640 \{\} \;;
+        echo "Waiting for Elasticsearch availability";
+        until curl -s --cacert config/certs/ca/ca.crt https://es01:9200 | grep -q "missing authentication credentials"; do sleep 30; done;
+        echo "Setting kibana_system password";
+        until curl -s -X POST --cacert config/certs/ca/ca.crt -u elastic:${ELASTIC_PASSWORD} -H "Content-Type: application/json" https://es01:9200/_security/user/kibana_system/_password -d "{\"password\":\"${KIBANA_PASSWORD}\"}" | grep -q "^{}"; do sleep 10; done;
         echo "All done!";
       '
     healthcheck:
-      test: [ "CMD-SHELL", "[ -f config/certs/es01/es01.crt ]" ]
+      test: ["CMD-SHELL", "[ -f config/certs/es01/es01.crt ]"]
       interval: 1s
       timeout: 5s
       retries: 120
+
   es01:
     depends_on:
       setup:
@@ -71,12 +76,13 @@ services:
     image: es01:local
     container_name: es01
     volumes:
-#      - ./elasticsearch/config/elasticsearch.yml:/usr/share/elasticsearch/config/elasticsearch.yml:ro,z
-      - ./certs:/usr/share/elasticsearch/config/certs
+      - certs:/usr/share/elasticsearch/config/certs
       - esdata01:/usr/share/elasticsearch/data
+    ports:
+      - ${ES_PORT}:9200
     environment:
       - node.name=es01
-      - cluster.name="docker-cluster"
+      - cluster.name=${CLUSTER_NAME}
       - cluster.initial_master_nodes=es01,es02,es03
       - discovery.seed_hosts=es02,es03
       - ELASTIC_PASSWORD=${ELASTIC_PASSWORD}
@@ -92,15 +98,12 @@ services:
       - xpack.security.transport.ssl.certificate=certs/es01/es01.crt
       - xpack.security.transport.ssl.certificate_authorities=certs/ca/ca.crt
       - xpack.security.transport.ssl.verification_mode=certificate
-      - xpack.license.self_generated.type=basic
+      - xpack.license.self_generated.type=${LICENSE}
       - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
-      - network.host= 0.0.0.0
     ulimits:
       memlock:
         soft: -1
         hard: -1
-    ports:
-      - ${ES_PORT}:9200
     healthcheck:
       test:
         [
@@ -110,8 +113,7 @@ services:
       interval: 10s
       timeout: 10s
       retries: 120
-    networks:
-      - elk
+
   es02:
     depends_on:
       - es01
@@ -121,15 +123,13 @@ services:
     image: es02:local
     container_name: es02
     volumes:
-#      - ./elasticsearch/config/elasticsearch.yml:/usr/share/elasticsearch/config/elasticsearch.yml:ro,z
-      - ./certs:/usr/share/elasticsearch/config/certs
+      - certs:/usr/share/elasticsearch/config/certs
       - esdata02:/usr/share/elasticsearch/data
     environment:
       - node.name=es02
-      - cluster.name="docker-cluster"
+      - cluster.name=${CLUSTER_NAME}
       - cluster.initial_master_nodes=es01,es02,es03
       - discovery.seed_hosts=es01,es03
-      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD}
       - bootstrap.memory_lock=true
       - xpack.security.enabled=true
       - xpack.security.http.ssl.enabled=true
@@ -142,10 +142,8 @@ services:
       - xpack.security.transport.ssl.certificate=certs/es02/es02.crt
       - xpack.security.transport.ssl.certificate_authorities=certs/ca/ca.crt
       - xpack.security.transport.ssl.verification_mode=certificate
-      - xpack.license.self_generated.type=basic
+      - xpack.license.self_generated.type=${LICENSE}
       - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
-      - network.host= 0.0.0.0
-
     ulimits:
       memlock:
         soft: -1
@@ -159,8 +157,7 @@ services:
       interval: 10s
       timeout: 10s
       retries: 120
-    networks:
-      - elk
+
   es03:
     depends_on:
       - es02
@@ -170,12 +167,11 @@ services:
     image: es03:local
     container_name: es03
     volumes:
-#      - ./elasticsearch/config/elasticsearch.yml:/usr/share/elasticsearch/config/elasticsearch.yml:ro,z
-      - ./certs:/usr/share/elasticsearch/config/certs
+      - certs:/usr/share/elasticsearch/config/certs
       - esdata03:/usr/share/elasticsearch/data
     environment:
       - node.name=es03
-      - cluster.name="docker-cluster"
+      - cluster.name=${CLUSTER_NAME}
       - cluster.initial_master_nodes=es01,es02,es03
       - discovery.seed_hosts=es01,es02
       - ELASTIC_PASSWORD=${ELASTIC_PASSWORD}
@@ -191,9 +187,8 @@ services:
       - xpack.security.transport.ssl.certificate=certs/es03/es03.crt
       - xpack.security.transport.ssl.certificate_authorities=certs/ca/ca.crt
       - xpack.security.transport.ssl.verification_mode=certificate
-      - xpack.license.self_generated.type=basic
+      - xpack.license.self_generated.type=${LICENSE}
       - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
-      - network.host= 0.0.0.0
 
     ulimits:
       memlock:
@@ -208,15 +203,49 @@ services:
       interval: 10s
       timeout: 10s
       retries: 120
-    networks:
-      - elk
-networks:
-  elk:
-    driver: bridge
+
+  kibana:
+    depends_on:
+      es01:
+        condition: service_healthy
+      es02:
+        condition: service_healthy
+      es03:
+        condition: service_healthy
+    build:
+      context: kibana
+      dockerfile: Dockerfile
+    image: kibana:local
+    container_name: kibana
+    volumes:
+      - certs:/usr/share/kibana/config/certs
+      - kibanadata:/usr/share/kibana/data
+    ports:
+      - ${KIBANA_PORT}:5601
+    environment:
+      - SERVERNAME=kibana
+      - ELASTICSEARCH_HOSTS=https://es01:9200
+      - ELASTICSEARCH_USERNAME=kibana_system
+      - ELASTICSEARCH_PASSWORD=${KIBANA_PASSWORD}
+      - ELASTICSEARCH_SSL_CERTIFICATEAUTHORITIES=config/certs/ca/ca.crt
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -s -I http://localhost:5601 | grep -q 'HTTP/1.1 302 Found'",
+        ]
+      interval: 10s
+      timeout: 10s
+      retries: 120
+
 volumes:
+  certs:
+    driver: local
   esdata01:
     driver: local
   esdata02:
     driver: local
   esdata03:
+    driver: local
+  kibanadata:
     driver: local
