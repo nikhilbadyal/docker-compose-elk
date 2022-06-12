@@ -216,7 +216,7 @@ services:
       context: kibana
       dockerfile: Dockerfile
     image: kibana:local
-    container_name: kibana
+    container_name: kib
     volumes:
       - certs:/usr/share/kibana/config/certs
       - kibanadata:/usr/share/kibana/data
@@ -228,6 +228,7 @@ services:
       - ELASTICSEARCH_USERNAME=kibana_system
       - ELASTICSEARCH_PASSWORD=${KIBANA_PASSWORD}
       - ELASTICSEARCH_SSL_CERTIFICATEAUTHORITIES=config/certs/ca/ca.crt
+      - xpack.reporting.roles.enabled=false
     healthcheck:
       test:
         [
