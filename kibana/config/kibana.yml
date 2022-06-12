@@ -1,3 +1,4 @@
 xpack.security.encryptionKey: 5h1e2yc1ogzv85q3ontrtmkjs366alyh
 xpack.reporting.encryptionKey: ym1et5pob2xvohjzddc4y4bpg2235vxu
 xpack.encryptedSavedObjects.encryptionKey: ck5j6uc335mfnkmpr8bdd5jon9fmjnx1
+xpack.reporting.roles.enabled: false
