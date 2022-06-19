@@ -8,7 +8,7 @@ services:
     image: setup:local
     container_name: elk-setup
     volumes:
-      - certs:/usr/share/elasticsearch/config/certs
+      - ./certs:/usr/share/elasticsearch/config/certs
     user: "0"
     command: >
       bash -c '
@@ -76,7 +76,7 @@ services:
     image: es01:local
     container_name: es01
     volumes:
-      - certs:/usr/share/elasticsearch/config/certs
+      - ./certs:/usr/share/elasticsearch/config/certs
       - esdata01:/usr/share/elasticsearch/data
     ports:
       - ${ES_PORT}:9200
@@ -124,7 +124,7 @@ services:
     image: es02:local
     container_name: es02
     volumes:
-      - certs:/usr/share/elasticsearch/config/certs
+      - ./certs:/usr/share/elasticsearch/config/certs
       - esdata02:/usr/share/elasticsearch/data
     environment:
       - node.name=es02
@@ -169,7 +169,7 @@ services:
     image: es03:local
     container_name: es03
     volumes:
-      - certs:/usr/share/elasticsearch/config/certs
+      - ./certs:/usr/share/elasticsearch/config/certs
       - esdata03:/usr/share/elasticsearch/data
     environment:
       - node.name=es03
@@ -221,8 +221,8 @@ services:
     image: kibana:local
     container_name: kibana
     volumes:
-      - ./kibana/kibana.yml:/usr/share/kibana/config/kibana.yml
-      - certs:/usr/share/kibana/config/certs
+#      - ./kibana/kibana.yml:/usr/share/kibana/config/kibana.yml
+      - ./certs:/usr/share/kibana/config/certs
       - kibanadata:/usr/share/kibana/data
     ports:
       - ${KIBANA_PORT}:5601
@@ -232,6 +232,11 @@ services:
       - ELASTICSEARCH_USERNAME=kibana_system
       - ELASTICSEARCH_PASSWORD=${KIBANA_PASSWORD}
       - ELASTICSEARCH_SSL_CERTIFICATEAUTHORITIES=config/certs/ca/ca.crt
+      - xpack.security.encryptionKey=5h1e2yc1ogzv85q3ontrtmkjs366alyh
+      - xpack.reporting.encryptionKey=ym1et5pob2xvohjzddc4y4bpg2235vxu
+      - xpack.encryptedSavedObjects.encryptionKey=ck5j6uc335mfnkmpr8bdd5jon9fmjnx1
+      - xpack.reporting.roles.enabled=false
+      - logging.root.level=warn
     healthcheck:
       test:
         [
@@ -243,8 +248,6 @@ services:
       retries: 120
 
 volumes:
-  certs:
-    driver: local
   esdata01:
     driver: local
   esdata02:
